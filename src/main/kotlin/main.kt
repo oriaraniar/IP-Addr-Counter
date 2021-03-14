@@ -16,50 +16,24 @@ var originalIPSize = 0
 var fileIndex = 0
 var nameBaseFile: String? = null
 
-object Prop {
-    private var prop: Properties? = null
-
-    @JvmName("getProp")
-    fun getProp(): Properties {
-        if (prop == null) {
-            prop = createProp()
-        }
-        return prop as Properties
-    }
-
-    private fun createProp(): Properties {
-        val fis: FileInputStream
-        val property = Properties()
-
-        try {
-            fis = FileInputStream("src/main/resources/prop.properties")
-            property.load(fis)
-        } catch (e: IOException) {
-            System.err.println("Property file is not exist")
-            throw e
-        }
-
-        return property
-    }
-}
-
-
 fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
     try {
         println("${Instant.now()} - Init")
-        if (checkCorrectPath(Prop.getProp().getProperty("testDirectory"))) {
+        if (checkCorrectPath(Prop.getProp().getProperty("tempDirectory"))) {
             println("temp directory is not correct")
             return
         }
-        //cleanTempDirectory()
 
-//        if (checkCorrectPath(Prop.getProp().getProperty("fileName"))) {
-//            println("file name is not correct")
-//            return
-//        }
+        if (checkCorrectPath(Prop.getProp().getProperty("fileName"))) {
+            println("file name is not correct")
+            return
+        }
+
+        cleanTempDirectory()
 
         println("${Instant.now()} - Start")
-        val result = parseFile()
+
+        val result = calculateUniqueIPAdresses()
 
         println("Original IP size is $originalIPSize")
         println("Unique IP address is $result")
@@ -82,18 +56,56 @@ fun cleanTempDirectory() {
     }
 }
 
+private fun calculateUniqueIPAdresses(): Long {
+    precursorySortDataFile()
+    println("${Instant.now()} - precursory sort data file finish")
+    return calculateUniqueIPAddressesFromIntermediateFiles()
+}
+
+fun precursorySortDataFile() {
+    val maxSize = Prop.getProp().getProperty("maxSizeSet").toInt()
+    val setIP = sortedSetOf<Long>()
+
+    var ipValue: String
+    var i = 0
+
+    try {
+        val bis = BufferedInputStream(FileInputStream(Prop.getProp().getProperty("fileName")))
+        val mainReader = BufferedReader(InputStreamReader(bis), Prop.getProp().getProperty("cashSize").toInt())
+
+        while (mainReader.ready()) {
+            ipValue = mainReader.readLine()
+            i++
+            originalIPSize++
+            if (!isValid(ipValue)) {
+                println("|$ipValue| is not valid IP")
+                continue
+            }
+            setIP.add(ipValue.replace(".", "0").toLong())
+            if (setIP.size > maxSize) {
+                saveCurrentDataIntoPrecursoryFile(setIP)
+                println("file created")
+                setIP.clear()
+            }
+            if (i > 5000000) {
+                println("${Instant.now()} - 5000000 line past")
+                i = 0
+            }
+        }
+        saveCurrentDataIntoPrecursoryFile(setIP)
+        println("last file created")
+        mainReader.close()
+    } catch (ex: IOException) {
+        ex.printStackTrace()
+    }
+}
+
 fun isValid(email: String?): Boolean {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS") val matcher: Matcher = pattern.matcher(email)
     return matcher.matches()
 }
 
-private fun parseFile(): Long {
-    //firstLine()
-    println("${Instant.now()} - firstLine finish")
-    return secondLine()
-}
-
-fun secondLine(): Long {
+fun calculateUniqueIPAddressesFromIntermediateFiles(): Long {
     val map = createFileMap()
     println("${Instant.now()} - file map created")
     val setIP = sortedSetOf<Long>()
@@ -105,13 +117,13 @@ fun secondLine(): Long {
     var value: Long
     var line: String
 
-    firstLoad(map, limit, setIP)
-    println("${Instant.now()} - first load end")
+    firstLoadDateFromIntermediateFiles(map, limit, setIP)
+    println("${Instant.now()} - first load end. Start main calculate unique IP addresses loop.")
 
     while (map.isNotEmpty()) {
-        println("${Instant.now()} - second line main loop. Result is $result")
+        println("${Instant.now()} - main calculate unique IP addresses new round. Result is $result")
         var deletedBuilder: BufferedReader? = null
-        result += clearTopSet(setIP, limit)
+        result += clearTopFromIPSet(setIP, limit)
         val readiedBufferElemMap = getReadiedBufferMapElem(map) ?: throw Exception("readiedBuffer is null")
 
         for (i in 0..(maxSize - setIP.size)) {
@@ -119,13 +131,11 @@ fun secondLine(): Long {
             if (readiedBufferElemMap.key.ready()) {
                 line = readiedBufferElemMap.key.readLine()
                 if (line.isNotEmpty()) {
-                    value = java.lang.Long.parseLong(line/*, 16*/)
-                    //setIP.add(value)
+                    value = java.lang.Long.parseLong(line, 16)
                     readiedBufferElemMap.setValue(value)
                 } else {
                     println("${Instant.now()} - file is end")
                 }
-
             } else {
                 deletedBuilder = readiedBufferElemMap.key
                 break
@@ -160,7 +170,7 @@ fun getReadiedBufferMapElem(map: MutableMap<BufferedReader, Long>): MutableMap.M
     return null
 }
 
-fun clearTopSet(ip: TreeSet<Long>, limit: Int): Int {
+fun clearTopFromIPSet(ip: TreeSet<Long>, limit: Int): Int {
     var result = 0
     var value: Long?
     for (i in 0..limit) {
@@ -175,7 +185,7 @@ fun clearTopSet(ip: TreeSet<Long>, limit: Int): Int {
     return result
 }
 
-private fun firstLoad(
+private fun firstLoadDateFromIntermediateFiles(
     map: MutableMap<BufferedReader, Long>,
     limit: Int,
     setIP: TreeSet<Long>
@@ -185,10 +195,8 @@ private fun firstLoad(
         for (i in 0..limit) {
             setIP.add(elem.value)
             if (elem.key.ready()) {
-                value = java.lang.Long.parseLong(elem.key.readLine()/*, 16*/)
+                value = java.lang.Long.parseLong(elem.key.readLine(), 16)
                 elem.setValue(value)
-                //setIP.add(value)
-                //elem.setValue(value)
             } else {
                 break
             }
@@ -210,7 +218,7 @@ private fun createFileMap(): MutableMap<BufferedReader, Long> {
             )
 
             if (reader.ready()) {
-                map[reader] = java.lang.Long.parseLong(reader.readLine()/*, 16*/)
+                map[reader] = java.lang.Long.parseLong(reader.readLine(), 16)
             } else {
                 map[reader] = 0
             }
@@ -219,46 +227,7 @@ private fun createFileMap(): MutableMap<BufferedReader, Long> {
     return map
 }
 
-fun firstLine() {
-    val maxSize = Prop.getProp().getProperty("maxSizeSet").toInt()
-    val setIP = sortedSetOf<Long>()
-
-    var line: String
-    var i = 0
-
-    try {
-        val bis = BufferedInputStream(FileInputStream(Prop.getProp().getProperty("fileName")))
-        val mainReader = BufferedReader(InputStreamReader(bis), Prop.getProp().getProperty("cashSize").toInt())
-
-        while (mainReader.ready()) {
-            line = mainReader.readLine()
-            i++
-            originalIPSize++
-            if (!isValid(line)) {
-                println("|$line| is not valid IP")
-                continue
-            }
-            setIP.add(line.replace(".", "0").toLong())
-            if (setIP.size > maxSize) {
-                saveCurrentDataIntoFile(setIP)
-                println("file created")
-                setIP.clear()
-            }
-            if (i > 5000000) {
-                println("${Instant.now()} - 5000000 past")
-                i = 0
-            }
-        }
-        saveCurrentDataIntoFile(setIP)
-        println("last file created")
-        mainReader.close()
-    } catch (ex: IOException) {
-        ex.printStackTrace()
-    }
-
-}
-
-private fun saveCurrentDataIntoFile(setIP: MutableSet<Long>) {
+private fun saveCurrentDataIntoPrecursoryFile(setIP: MutableSet<Long>) {
     val filePref = Prop.getProp().getProperty("firstLineFilePref")
     val tempDirectory = Prop.getProp().getProperty("tempDirectory")
     val nameCurrentFile = getCurrentFile("$tempDirectory\\$filePref")
@@ -284,7 +253,6 @@ private fun getNextFileIndex(): String {
     return result
 }
 
-
 private fun checkCorrectPath(path: String?): Boolean {
     if (path.isNullOrEmpty()) {
         print("path is null or empty")
@@ -299,4 +267,31 @@ private fun checkCorrectPath(path: String?): Boolean {
         return true
     }
     return false
+}
+
+object Prop {
+    private var prop: Properties? = null
+
+    @JvmName("getProp")
+    fun getProp(): Properties {
+        if (prop == null) {
+            prop = createProp()
+        }
+        return prop as Properties
+    }
+
+    private fun createProp(): Properties {
+        val fis: FileInputStream
+        val property = Properties()
+
+        try {
+            fis = FileInputStream("src/main/resources/prop.properties")
+            property.load(fis)
+        } catch (e: IOException) {
+            System.err.println("Property file is not exist")
+            throw e
+        }
+
+        return property
+    }
 }
