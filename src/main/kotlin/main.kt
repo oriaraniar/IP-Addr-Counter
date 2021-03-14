@@ -12,6 +12,7 @@ private const val IPV4_PATTERN = "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25
 
 private val pattern: Pattern = Pattern.compile(IPV4_PATTERN)
 
+var originalIPSize = 0
 var fileIndex = 0
 var nameBaseFile: String? = null
 
@@ -46,21 +47,24 @@ object Prop {
 fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
     try {
         println("${Instant.now()} - Init")
-        if (checkCorrectPath(Prop.getProp().getProperty("tempDirectory"))) {
+        if (checkCorrectPath(Prop.getProp().getProperty("testDirectory"))) {
             println("temp directory is not correct")
             return
         }
-        cleanTempDirectory()
+        //cleanTempDirectory()
 
-        if (checkCorrectPath(Prop.getProp().getProperty("fileName"))) {
-            println("file name is not correct")
-            return
-        }
+//        if (checkCorrectPath(Prop.getProp().getProperty("fileName"))) {
+//            println("file name is not correct")
+//            return
+//        }
 
         println("${Instant.now()} - Start")
         val result = parseFile()
 
+        println("Original IP size is $originalIPSize")
         println("Unique IP address is $result")
+        println("Delta IP is ${originalIPSize - result}")
+
         println("Finish")
     } catch (e: Exception) {
         System.err.println("Program is crashed")
@@ -84,7 +88,7 @@ fun isValid(email: String?): Boolean {
 }
 
 private fun parseFile(): Long {
-    firstLine()
+    //firstLine()
     println("${Instant.now()} - firstLine finish")
     return secondLine()
 }
@@ -110,12 +114,13 @@ fun secondLine(): Long {
         result += clearTopSet(setIP, limit)
         val readiedBufferElemMap = getReadiedBufferMapElem(map) ?: throw Exception("readiedBuffer is null")
 
-        for (i in 0..maxSize - setIP.size) {
+        for (i in 0..(maxSize - setIP.size)) {
+            setIP.add(readiedBufferElemMap.value)
             if (readiedBufferElemMap.key.ready()) {
                 line = readiedBufferElemMap.key.readLine()
                 if (line.isNotEmpty()) {
-                    value = java.lang.Long.parseLong(line, 16)
-                    setIP.add(value)
+                    value = java.lang.Long.parseLong(line/*, 16*/)
+                    //setIP.add(value)
                     readiedBufferElemMap.setValue(value)
                 } else {
                     println("${Instant.now()} - file is end")
@@ -132,6 +137,7 @@ fun secondLine(): Long {
         }
 
     }
+    result += setIP.size
     println("Size uniqie elem is $result")
     return result
 }
@@ -177,10 +183,14 @@ private fun firstLoad(
     var value: Long
     for (elem in map.entries) {
         for (i in 0..limit) {
+            setIP.add(elem.value)
             if (elem.key.ready()) {
-                value = java.lang.Long.parseLong(elem.key.readLine(), 16)
-                setIP.add(value)
+                value = java.lang.Long.parseLong(elem.key.readLine()/*, 16*/)
                 elem.setValue(value)
+                //setIP.add(value)
+                //elem.setValue(value)
+            } else {
+                break
             }
         }
     }
@@ -189,7 +199,7 @@ private fun firstLoad(
 private fun createFileMap(): MutableMap<BufferedReader, Long> {
     val map = mutableMapOf<BufferedReader, Long>()
 
-    val dir = File(Prop.getProp().getProperty("tempDirectory"))
+    val dir = File(Prop.getProp().getProperty("testDirectory"))
     if (dir.isDirectory) {
         @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS") val children: Array<String> = dir.list()
         for (i in children.indices) {
@@ -199,8 +209,11 @@ private fun createFileMap(): MutableMap<BufferedReader, Long> {
                 Prop.getProp().getProperty("cashSize").toInt() / children.size
             )
 
-            map[reader] = 0
-
+            if (reader.ready()) {
+                map[reader] = java.lang.Long.parseLong(reader.readLine()/*, 16*/)
+            } else {
+                map[reader] = 0
+            }
         }
     }
     return map
@@ -220,6 +233,7 @@ fun firstLine() {
         while (mainReader.ready()) {
             line = mainReader.readLine()
             i++
+            originalIPSize++
             if (!isValid(line)) {
                 println("|$line| is not valid IP")
                 continue
@@ -235,6 +249,8 @@ fun firstLine() {
                 i = 0
             }
         }
+        saveCurrentDataIntoFile(setIP)
+        println("last file created")
         mainReader.close()
     } catch (ex: IOException) {
         ex.printStackTrace()
