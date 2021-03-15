@@ -33,7 +33,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
         println("${Instant.now()} - Start")
 
-        val result = calculateUniqueIPAdresses()
+        val result = calculateUniqueIPAddresses()
 
         println("Original IP size is $originalIPSize")
         println("Unique IP address is $result")
@@ -56,7 +56,7 @@ fun cleanTempDirectory() {
     }
 }
 
-private fun calculateUniqueIPAdresses(): Long {
+private fun calculateUniqueIPAddresses(): Long {
     precursorySortDataFile()
     println("${Instant.now()} - precursory sort data file finish")
     return calculateUniqueIPAddressesFromIntermediateFiles()
@@ -148,7 +148,7 @@ fun calculateUniqueIPAddressesFromIntermediateFiles(): Long {
 
     }
     result += setIP.size
-    println("Size uniqie elem is $result")
+    println("Size unique elem is $result")
     return result
 }
 
