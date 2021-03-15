@@ -207,7 +207,7 @@ private fun firstLoadDateFromIntermediateFiles(
 private fun createFileMap(): MutableMap<BufferedReader, Long> {
     val map = mutableMapOf<BufferedReader, Long>()
 
-    val dir = File(Prop.getProp().getProperty("testDirectory"))
+    val dir = File(Prop.getProp().getProperty("tempDirectory"))
     if (dir.isDirectory) {
         @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS") val children: Array<String> = dir.list()
         for (i in children.indices) {
